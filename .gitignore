@@ -3,6 +3,9 @@ logs
 *.log
 npm-debug.log*
 
+#notepad++
+*.bak
+
 # Runtime data
 pids
 *.pid

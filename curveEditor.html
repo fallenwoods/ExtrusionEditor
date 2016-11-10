@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Curve Editor</title>
+<style>
+
+body {
+  font: 13px sans-serif;
+  position: relative;
+  width: 960px;
+  height: 500px;
+}
+
+form {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+}
+
+rect {
+  fill: none;
+  stroke: black;
+  stroke-width: 1.5px;
+  pointer-events: all;
+}
+
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+.origin {
+  fill:  #FF0000;
+  stroke: #FF0000;
+  cursor: move;
+}
+circle{
+  fill:  #fff;
+  stroke: steelblue;
+  stroke-opacity: .2;
+  stroke-width: 1.5px;
+  fill-opacity: .2;
+  cursor: move;
+}
+
+.selected {
+  fill: #ff7f0e;
+  stroke: #ff7f0e;
+}
+
+</style>
+<script src="libs/d3.v3.js"></script>
+<script src="js/curveEditor.js"></script>
+<script>
+var editor1 = new CurveEditor("body",{range:[-3,3],handleChoice:2});
+var editor2 = new CurveEditor("body",{isClosed:true,range:[-3,3],showControlPoints:false,origin:[-1,0]});
+
+
+</script>

@@ -142,7 +142,7 @@ function CurveEditor(parentElement,options){
 				return d.name; });
   
 
-	var id = this.svg[0][0].getBoundingClientRect()
+	var id = this.svg.node().getBoundingClientRect()
 	id = id.top+""+id.left;
 	d3.select(window)
 		.on("mousemove."+id, this.mousemove.bind(this))

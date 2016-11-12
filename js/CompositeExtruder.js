@@ -190,18 +190,44 @@ function CompositeExtrudeGeometry (crossSection, options, transformerOptions) {
 	this.uvFunc = this.surfaceFunc.bind(this)
 	
 	// create side walls
-	var result = new THREE.ParametricGeometry(this.uvFunc,crossSectionGeo.vertices.length,this.options.extrudeSteps);
+	var result = new THREE.ParametricGeometry(this.uvFunc,crossSectionGeo.vertices.length-1,this.options.extrudeSteps-1);	
+	
 	
 	// If we close the extrusion (join the end face back to the starting face), then we won't close it...
 	if(this.options.closeExtrusion) {	// close requested, so connect end to beginning
 		// Hack Alert, ParametricGeometry can't sew the ends together, so I'll do it manually here
 		// fixme - I don't create new faces, I replace the verices in the last crossSection with the corresponding ones in the first crossSection
+		/*
 		var lastVertex = result.vertices.length-(crossSectionGeo.vertices.length+1);
 		for(var i = result.faces.length-(2*crossSectionGeo.vertices.length); i < result.faces.length;i++){
 			result.faces[i].a = result.faces[i].a >= lastVertex ? result.faces[i].a - lastVertex :result.faces[i].a;
 			result.faces[i].b = result.faces[i].b >= lastVertex ? result.faces[i].b - lastVertex :result.faces[i].b;
 			result.faces[i].c = result.faces[i].c >= lastVertex ? result.faces[i].c - lastVertex :result.faces[i].c;
 		}	
+		*/
+		var vertices = result.vertices;
+		var count = crossSectionGeo.vertices.length-1;
+		var firstEndVertex =  vertices.length-(count+1);
+		var minDistance = Number.MAX_VALUE;
+		var curDistance = minDistance;
+		var closest=0;
+		for(var i = 0; i < count ; i++){ 
+			if((curDistance = vertices[firstEndVertex].distanceTo(vertices[i])) < minDistance) {
+				minDistance = curDistance;
+				closest = i;
+			}
+		}
+		for (var i = 0; i < count; i++){
+			result.faces.push(new THREE.Face3((i+closest)%count,(firstEndVertex+i),(firstEndVertex+i+1)));
+			result.faces.push(new THREE.Face3((i+closest)%count,(firstEndVertex+i+1),(i+closest)%count+1));
+			var u0 = ((i+closest)%count)/count;
+			var u1 = ((i+closest)%count + 1)/count;
+			var v0 = 1-(1/this.options.extrudeSteps);
+			var v1 = 1;
+			result.faceVertexUvs[0].push([new THREE.Vector2(u0,v1),new THREE.Vector2(u0,v0),new THREE.Vector2(u1,v0)]);
+			result.faceVertexUvs[0].push([new THREE.Vector2(u0,v1),new THREE.Vector2(u1,v0),new THREE.Vector2(u1,v1)]);
+
+		}
 	// if we did not close the extrusion we can either cap or leave the ends open
 	} else if(this.options.capExtrusion){	// if not closed, cap if requested
 		// create opening end cap
@@ -250,10 +276,11 @@ function followerTransformer(steps,options){
 	
 	// Get the points and normals for the extrusion path
 	// Hack alert - using a very thin tube with one step around the circumference (os it's not really a tube at all) 
-	var pathGeo = new THREE.TubeGeometry(options.extrusionPath3,steps,.0000000000001,1,options.closeExtrusion); 
+	var pathGeo = new THREE.TubeGeometry(options.extrusionPath3,steps+1,.0000000000001,1,options.closeExtrusion); 
 
 	// create an array of transformation matrices that correspond to each step along the extruder curve
-	for(var i = 0;i<=steps;i++){
+	//for(var i = 0;i<pathGeo.vertices.length;i++){//steps;i++){	// fixme - why is there one less vertex than normal and bi-normal?
+	for(var i = 0;i<=steps;i++){//steps;i++){	// fixme - why is there one less vertex than normal and bi-normal?
 		var matrix = new THREE.Matrix4();
 		matrix.set(
 			pathGeo.binormals[i].x,pathGeo.binormals[i].y,pathGeo.binormals[i].z,0,			// bi-normal is perpendicular to normal and tagent at point

@@ -62,12 +62,13 @@ circle{
 	<body>
 
 		<script src="libs/three.js"></script>
+		<script src="libs/CurveExtras.js"></script>
 		<script src="libs/OBJExporter.js"></script>
 		<!-- script src="js/controls/TrackballControls.js"></script -->
 		<script src="js/CompositeExtruder.js"></script>
 		<script src="libs/TJMOrbitControls.js"></script>
-		<!-- script src="libs/d3.v3.js"></script -->
-		<script src="https://d3js.org/d3.v3.min.js"></script>
+		<script src="libs/d3.v3.js"></script>
+		<!-- script src="https://d3js.org/d3.v3.min.js"></script -->
 		<script src="js/curveEditor.js"></script>
 <table>
   <tr>
@@ -185,12 +186,13 @@ circle{
 				
 				//var material = new THREE.MeshLambertMaterial( { color: 0xb00000, wireframe: false,side: THREE.DoubleSide } );
 				//var material = new THREE.MeshLambertMaterial( { color: 0xb00000, wireframe: false } );
-				material = new THREE.MeshPhongMaterial( { color: 0x550000, specular: 0x444444, shininess: 80, transparent:true, opacity:0.6, side:THREE.DoubleSide }  );
+				material = new THREE.MeshPhongMaterial( { color: 0x550000, specular: 0x444444, shininess: 80, transparent:false, opacity:0.6, side:THREE.DoubleSide, wireframe: false}  );
 				material2 = new THREE.MeshLambertMaterial( { color: 0xff8000, wireframe: false, side:THREE.DoubleSide } );
 				
 				
 				var axisHelper = new THREE.AxisHelper( 30 );
 				scene.add( axisHelper );	
+
 // End scene configuration
 
 // My stuff
@@ -261,6 +263,8 @@ var rotAndBackFunc = function(v) { return v < 0.5 ? v*2*Math.PI : (1-v)*2*Math.P
 
 			}
  function handlesToPath(handleChoice) {	
+ 
+	if(!handleChoice.useHandles) return handleChoice.curve;
 
 	var result = new THREE.Shape();
 	var handles = handleChoice.getObjectHandles();
@@ -316,10 +320,10 @@ function rotationCallback(handleChoice) {
 var spineCurve;
 var closeExtrusion;
 function spineCallback(handleChoice) {
-	//spineCurve = handlesToPath(handleChoice);
-	spineCurve = spineCurve ||  new CustomSinCurve( 2 );
-	closeExtrusion = false;
-	//closeExtrusion = handleChoice.isClosed;
+	spineCurve = handlesToPath(handleChoice);
+	closeExtrusion = handleChoice.isClosed;
+	//spineCurve = spineCurve ||  new CustomSinCurve( 2 );
+	//closeExtrusion = false;
 	sceneUpdated = true;
 }
 
@@ -342,8 +346,10 @@ var editorRotationFunc = function(v) {
 	}
 }
 			function update(scene,material){
-				if (scene.editorObject) 
-					scene.remove(scene.getObjectById(scene.editorObject))
+				if (scene.editorObject) {
+					scene.remove(scene.getObjectById(scene.editorObject[0]))
+					scene.remove(scene.getObjectById(scene.editorObject[1]))
+				}
 				var geo = new CompositeExtrudeGeometry(
 					crossSectionCurve,
 					{
@@ -360,13 +366,12 @@ var editorRotationFunc = function(v) {
 				);
 
 				var mesh = new THREE.Mesh( geo, material );
-				
-				//var normals = new THREE.FaceNormalsHelper( mesh, 2, 0x00ff00, 1 );
-				//scene.add( normals );	
-
 				scene.add( mesh );	
 				
-				scene.editorObject = mesh.id;
+				var normals = new THREE.FaceNormalsHelper( mesh, 0.05, 0x00ff00, 1 );
+				//scene.add( normals );	
+				
+				scene.editorObject = [mesh.id,normals.id]
 				
 				return scene;
 			}

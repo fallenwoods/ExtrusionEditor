@@ -46,6 +46,21 @@ function CurveEditor(parentElement,options){
 	this.helpfulHandles.push(new Handles(this,'line','sharp',5,true));
 	this.helpfulHandles.push(new Handles(this));
 	
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'GrannyKnot',curve:new THREE.Curves.GrannyKnot()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'HeartCurve',curve:new THREE.Curves.HeartCurve(3.5)}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'VivianiCurve',curve:new THREE.Curves.VivianiCurve(10)}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'KnotCurve',curve:new THREE.Curves.KnotCurve()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'HelixCurve',curve:new THREE.Curves.HelixCurve(),isClosed:false}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TrefoilKnot',curve:new THREE.Curves.TrefoilKnot()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TorusKnot',curve:new THREE.Curves.TorusKnot(20)}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'CinquefoilKnot',curve:new THREE.Curves.CinquefoilKnot(20)}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TrefoilPolynomialKnot',curve:new THREE.Curves.TrefoilPolynomialKnot(14)}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'FigureEightPolynomialKnot',curve:new THREE.Curves.FigureEightPolynomialKnot()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot4a',curve:new THREE.Curves.DecoratedTorusKnot4a()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot4b',curve:new THREE.Curves.DecoratedTorusKnot4b()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot5a',curve:new THREE.Curves.DecoratedTorusKnot5a()}));
+	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot5c',curve:new THREE.Curves.DecoratedTorusKnot5c()}));
+	
 	this.table = d3.select(parentElement||"body").append("table")
 
 	this.svg = this.table.append("svg")
@@ -162,7 +177,9 @@ CurveEditor.prototype = {
 	 myLine:function() {	
 		// For display, the points are scaled to lie within the middle 80% of the drawing area
 
-		var handles = this.handles;
+		if(!this.handleChoice.useHandles) return "M1,1L-1,-1M-1,1L1,-1";
+		
+		var handles = this.handleChoice.getViewHandles();
 		var result = "";
 		
 		// Move to the first point
@@ -196,98 +213,100 @@ CurveEditor.prototype = {
 	redraw:function() {
 	  if(!this.handleChoice) return;
 	  
-	  // fixme - make handleChoice and handle collection first class objects.
-	  this.handles = this.handleChoice.getViewHandles();
-	  this.selected = this.selected || {d:this.handles[0],c:'knot'};
-	  this.CPsToShow = this.handleChoice.CPsToShow;
-	  
 	  this.svg.select(".line").attr("d", (this.myLine).bind(this));
 	  
-
-
+	  if(this.handleChoice.useHandles) {
 	  
-	  var knots = this.svg.selectAll(".knot")
-		  .data(this.handles.slice(0,this.handleChoice.handlesToShow), function(d) { return d.pt });
-
-	  knots.enter().append("circle")		  
-			  .attr("r", 1e-6)
-			  .on("mousedown", function(d) { 
-				d.editor.selected = d.editor.dragged = {d:d,c:'knot'}; 
-				d.editor.addHistory('moveKnot',d.editor.dragged,d.editor.dragged.d.pt);
-				d.editor.redraw(); 
-			   })
-			.transition()
-			  .duration(1750)
-			  .ease("elastic")
-			  .attr("r", 6.5)
+		  // fixme - make handleChoice and handle collection first class objects.
+		  this.handles = this.handleChoice.getViewHandles();
+		  this.selected = this.selected || {d:this.handles[0],c:'knot'};
+		  this.CPsToShow = this.handleChoice.CPsToShow;	  
 
 
-	  knots
-		  .classed("knot", true)
-		  .classed("selected", function(d) { return d === d.editor.selected.d && "knot" === d.editor.selected.c; })
-		  .attr("cx", function(d) { 
-		  d = d.toCanvas(); return d.pt[0]; })
-		  .attr("cy", function(d) { 
-		  d = d.toCanvas(); return d.pt[1]; });
+		  
+		  var knots = this.svg.selectAll(".knot")
+			  .data(this.handles.slice(0,this.handleChoice.handlesToShow), function(d) { return d.pt });
+
+		  knots.enter().append("circle")		  
+				  .attr("r", 1e-6)
+				  .on("mousedown", function(d) { 
+					d.editor.selected = d.editor.dragged = {d:d,c:'knot'}; 
+					d.editor.addHistory('moveKnot',d.editor.dragged,d.editor.dragged.d.pt);
+					d.editor.redraw(); 
+				   })
+				.transition()
+				  .duration(1750)
+				  .ease("elastic")
+				  .attr("r", 6.5)
 
 
-	  knots.exit().remove();
-
-	  var cp1s = this.svg.selectAll(".cp1")
-		  .data(this.handles.slice(0,this.handleChoice.CPsToShow), function(d) { return d.pt });
-
-	  cp1s.enter().append("circle")		  
-			  .attr("r", 1e-6)
-			  .on("mousedown", function(d) { 
-				d.editor.selected = d.editor.dragged = {d:d,c:'cp1'}; 
-				d.editor.addHistory('moveCp',d.editor.dragged,d.editor.dragged.d.cpOffset);
-				d.editor.redraw();
-			   })
-			.transition()
-			  .duration(1750)
-			  .ease("elastic")
-			  .attr("r", 3)
+		  knots
+			  .classed("knot", true)
+			  .classed("selected", function(d) { return d === d.editor.selected.d && "knot" === d.editor.selected.c; })
+			  .attr("cx", function(d) { 
+			  d = d.toCanvas(); return d.pt[0]; })
+			  .attr("cy", function(d) { 
+			  d = d.toCanvas(); return d.pt[1]; });
 
 
-	  cp1s
-		  .classed("cp1", true)
-		  .classed("selected", function(d) { return d === d.editor.selected.d && "cp1" === d.editor.selected.c; })
-		  .attr("cx", function(d) { 
-		  d = d.toCanvas(); return d.pt[0]+d.cpOffset[0]; })
-		  .attr("cy", function(d) { 
-		  d = d.toCanvas(); return d.pt[1]+d.cpOffset[1]; });
+		  knots.exit().remove();
+
+		  var cp1s = this.svg.selectAll(".cp1")
+			  .data(this.handles.slice(0,this.handleChoice.CPsToShow), function(d) { return d.pt });
+
+		  cp1s.enter().append("circle")		  
+				  .attr("r", 1e-6)
+				  .on("mousedown", function(d) { 
+					d.editor.selected = d.editor.dragged = {d:d,c:'cp1'}; 
+					d.editor.addHistory('moveCp',d.editor.dragged,d.editor.dragged.d.cpOffset);
+					d.editor.redraw();
+				   })
+				.transition()
+				  .duration(1750)
+				  .ease("elastic")
+				  .attr("r", 3)
 
 
-	  cp1s.exit().remove();
-	  
-	  var cp2s = this.svg.selectAll(".cp2")
-		  .data(this.handles.slice(0,this.handleChoice.CPsToShow), function(d) { return d.pt });
-
-	  cp2s.enter().append("circle")		  
-			  .attr("r", 1e-6)
-			  .on("mousedown", function(d) { 
-				d.editor.selected = d.editor.dragged = {d:d,c:'cp2'}; 
-				d.editor.addHistory('moveCp',d.editor.dragged,d.editor.dragged.d.cpOffset);
-				d.editor.redraw(); 
-			   })
-			  //.on("mousemove", function(d,i,n) { 
-			  //d.editor.selected = {d:d,c:'cp2'}; d.editor.redraw();})
-			.transition()
-			  .duration(1750)
-			  .ease("elastic")
-			  .attr("r", 3)
+		  cp1s
+			  .classed("cp1", true)
+			  .classed("selected", function(d) { return d === d.editor.selected.d && "cp1" === d.editor.selected.c; })
+			  .attr("cx", function(d) { 
+			  d = d.toCanvas(); return d.pt[0]+d.cpOffset[0]; })
+			  .attr("cy", function(d) { 
+			  d = d.toCanvas(); return d.pt[1]+d.cpOffset[1]; });
 
 
-	  cp2s
-		  .classed("cp2", true)
-		  .classed("selected", function(d) { return d === d.editor.selected.d && "cp2" === d.editor.selected.c; })
-		  .attr("cx", function(d) { 
-		  d = d.toCanvas(); return d.pt[0]-d.cpOffset[0]; })
-		  .attr("cy", function(d) { 
-		  d = d.toCanvas(); return d.pt[1]-d.cpOffset[1]; });
+		  cp1s.exit().remove();
+		  
+		  var cp2s = this.svg.selectAll(".cp2")
+			  .data(this.handles.slice(0,this.handleChoice.CPsToShow), function(d) { return d.pt });
+
+		  cp2s.enter().append("circle")		  
+				  .attr("r", 1e-6)
+				  .on("mousedown", function(d) { 
+					d.editor.selected = d.editor.dragged = {d:d,c:'cp2'}; 
+					d.editor.addHistory('moveCp',d.editor.dragged,d.editor.dragged.d.cpOffset);
+					d.editor.redraw(); 
+				   })
+				  //.on("mousemove", function(d,i,n) { 
+				  //d.editor.selected = {d:d,c:'cp2'}; d.editor.redraw();})
+				.transition()
+				  .duration(1750)
+				  .ease("elastic")
+				  .attr("r", 3)
 
 
-	  cp2s.exit().remove();
+		  cp2s
+			  .classed("cp2", true)
+			  .classed("selected", function(d) { return d === d.editor.selected.d && "cp2" === d.editor.selected.c; })
+			  .attr("cx", function(d) { 
+			  d = d.toCanvas(); return d.pt[0]-d.cpOffset[0]; })
+			  .attr("cy", function(d) { 
+			  d = d.toCanvas(); return d.pt[1]-d.cpOffset[1]; });
+
+
+		  cp2s.exit().remove();
+	  }
 	  
 	  
 	  if(this.callback) {	
@@ -458,6 +477,7 @@ CurveEditor.prototype = {
 	joined:true, false
 */
 
+
 function Handles(editor,shape,smoothness,reflections,joined,options){
 	
 	this.editor = editor;
@@ -467,11 +487,16 @@ function Handles(editor,shape,smoothness,reflections,joined,options){
 	this.reflections = (reflections === undefined || reflections < 2) ? 2 : reflections;
 	this.isClosed = true;
 	this.options = options || {}
+	this.swirlInc = this.options.swirl || 0;		//fixme - swirl is a good idea - makes radius go from 1 to scaleMultiplier rather than const scaleMultiplier
+	this.curve = this.options.curve;
+	//this.zInc = options.zInc || 0;		// fixme - this one isn't as clear, we might want something more general here. 
 	
 	this.name = this.smoothness+'-'+this.shape+'-'+this.reflections+(this.joined?'-joined':'');
+	this.name  = this.options.name || this.name;
 	
 	this.baseHandles = [];
 	this.viewHandles;
+	this.useHandles = true;
 	
 	var cp;
 	switch(this.shape){
@@ -489,17 +514,25 @@ function Handles(editor,shape,smoothness,reflections,joined,options){
 			cp =  [0.2,0]
 			this.handlesToShow = this.joined ? 2 : 2 * this.reflections
 		break;
+		case 'custom':
+			this.handlesToShow = 0;
+			this.reflections = 1;
+			this.isClosed = this.options.isClosed || true;
+			this.useHandles = false;
+		break;
 	}
 	
 	this.CPsToShow = (this.smoothness === 'smooth') ? this.handlesToShow : 0;		// show cp for pts that have handles?
 	
 	cp = this.smoothness !== 'smooth' ? [0,0] : cp;
 	
-	var handle = new Handle(this.editor,[0,1],cp);
-	this.baseHandles.push(handle);
-	if(this.shape === 'star') {
-		handle = new Handle(this.editor,[0,0.5],cp).rotate(-(2 * Math.PI) / (2 * this.reflections));
+	if(this.useHandles){
+		var handle = new Handle(this.editor,[0,1],cp);
 		this.baseHandles.push(handle);
+		if(this.shape === 'star') {
+			handle = new Handle(this.editor,[0,0.5],cp).rotate(-(2 * Math.PI) / (2 * this.reflections));
+			this.baseHandles.push(handle);
+		}
 	}
 
 

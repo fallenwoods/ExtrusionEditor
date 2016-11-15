@@ -7,19 +7,37 @@
 // Question: If i separate these, where do things like undo for model selection go?
 
 function CurveEditor(parentElement,options){
+	
+	this.initHelpfulHandles();
+	
+	if(typeof options === 'string') {
+		var parsed = JSON.parse(options);
+		this.options = parsed.options;
+		var handleChoice = -1;
+		for(var i = 0; i< this.helpfulHandles.length; i++){
+			if (this.helpfulHandles[i].name === this.options.handleChoice) { handleChoice = i; break;}
+		}
+		if(handleChoice == -1) {
+			var handles = parsed.handles;
+			handleChoice = this.helpfulHandles.length;
+			this.helpfulHandles.push( new Handles(this, handles.shape,handles.smoothness,handles.reflections,handles.joined,handles.options));
+		}
+		// fixme - we should not be reaching inside of Handles here.
+		this.handleChoice.baseHandles = parsed.handles.baseHandles;
+	}
 
-	options = options || {};
+	this.options = options || {};
 
 	this.CPsToShow = options.CPsToShow !== undefined ? options.CPsToShow : true;
 	this.callback = options.callback ;
 	this.isClosed = options.isClosed ? options.isClosed : false;	//default is false (or undefined)
-	this.handles = options.handles;
-	options.range = options.range || [-3,3];	// reasonable default for open editors
-	options.size = options.size || 150;
-	options.origin = options.origin || [0,0];
-	options.scaleMultiplier = options.scaleMultiplier !== undefined ? options.scaleMultiplier : 1;
-	options.handleChoice = options.handleChoice || 0;
-	this.canvas = new MyCanvas (options.size, options.range);
+	//this.handles = options.handles;
+	this.options.range = options.range || [-3,3];	// reasonable default for open editors
+	this.options.size = options.size || 150;
+	this.options.origin = options.origin || [0,0];
+	this.options.scaleMultiplier = options.scaleMultiplier !== undefined ? options.scaleMultiplier : 1;
+	this.options.handleChoice = options.handleChoice || 0;
+	this.canvas = new MyCanvas (this.options.size, this.options.range);
 	
 	this.ctrlKey = false;
 	this.altKey = false;
@@ -27,39 +45,9 @@ function CurveEditor(parentElement,options){
 	this.historyStack = [];
 	this.historyIndex = 0;
 	
-	this.scaleMultiplier = options.scaleMultiplier || 1;
-	this.origin = options.origin || [0,0];
+	this.scaleMultiplier = this.options.scaleMultiplier || 1;
+	this.origin = this.options.origin || [0,0];
 
-	this.helpfulHandles = [];	
-	
-
-	this.helpfulHandles.push(new Handles(this,'line','sharp',2,false));
-	this.helpfulHandles.push(new Handles(this,'line','sharp',2,false,{offset:1}));
-	this.helpfulHandles.push(new Handles(this,'circle','smooth',4,true));
-	this.helpfulHandles.push(new Handles(this,'circle','smooth',4,false));
-	this.helpfulHandles.push(new Handles(this,'circle','sharp',6,false));
-	this.helpfulHandles.push(new Handles(this,'circle','sharp',4,false));
-	this.helpfulHandles.push(new Handles(this,'star','smooth',4,false));
-	this.helpfulHandles.push(new Handles(this,'star','smooth',5,true));
-	this.helpfulHandles.push(new Handles(this,'star','sharp',5,false));
-	this.helpfulHandles.push(new Handles(this,'star','sharp',5,true));
-	this.helpfulHandles.push(new Handles(this,'line','sharp',5,true));
-	this.helpfulHandles.push(new Handles(this));
-	
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'GrannyKnot',curve:new THREE.Curves.GrannyKnot()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'HeartCurve',curve:new THREE.Curves.HeartCurve(3.5)}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'VivianiCurve',curve:new THREE.Curves.VivianiCurve(10)}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'KnotCurve',curve:new THREE.Curves.KnotCurve()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'HelixCurve',curve:new THREE.Curves.HelixCurve(),isClosed:false}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TrefoilKnot',curve:new THREE.Curves.TrefoilKnot()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TorusKnot',curve:new THREE.Curves.TorusKnot(20)}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'CinquefoilKnot',curve:new THREE.Curves.CinquefoilKnot(20)}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TrefoilPolynomialKnot',curve:new THREE.Curves.TrefoilPolynomialKnot(14)}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'FigureEightPolynomialKnot',curve:new THREE.Curves.FigureEightPolynomialKnot()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot4a',curve:new THREE.Curves.DecoratedTorusKnot4a()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot4b',curve:new THREE.Curves.DecoratedTorusKnot4b()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot5a',curve:new THREE.Curves.DecoratedTorusKnot5a()}));
-	this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot5c',curve:new THREE.Curves.DecoratedTorusKnot5c()}));
 	
 	this.table = d3.select(parentElement||"body").append("table")
 
@@ -145,7 +133,7 @@ function CurveEditor(parentElement,options){
 			.attr("value", function(d,i) { 
 				return i; })
 			.attr("selected", function(d,i) { 
-					if (i === (options.handleChoice || 0)) {
+					if (i === (this.options.handleChoice || 0)) {
 
 						editor.handleChoice =  editor.helpfulHandles[i];
 						return true;
@@ -467,7 +455,52 @@ CurveEditor.prototype = {
 		for(var i = this.historyIndex; i > 0; i--)
 			this.undo();
 	},
+	toJSON:function(){
+		return {curveEditor:
+			{options:this.options,
+			 handleChoice:this.helpfulHandles[this.options.handleChoice]
+			}
+		};
+	},
+	initHelpfulHandles:function(){
+		
+		this.helpfulHandles = [];	
 
+		this.helpfulHandles.push(new Handles(this,'line','sharp',2,false));
+		this.helpfulHandles.push(new Handles(this,'line','sharp',2,false,{offset:1}));
+		this.helpfulHandles.push(new Handles(this,'circle','smooth',4,true));
+		this.helpfulHandles.push(new Handles(this,'circle','smooth',4,false));
+		this.helpfulHandles.push(new Handles(this,'circle','sharp',6,false));
+		this.helpfulHandles.push(new Handles(this,'circle','sharp',4,false));
+		this.helpfulHandles.push(new Handles(this,'star','smooth',4,false));
+		this.helpfulHandles.push(new Handles(this,'star','sharpt',12,true));
+		this.helpfulHandles.push(new Handles(this,'star','smooth',5,true));
+		this.helpfulHandles.push(new Handles(this,'star','sharp',5,false));
+		this.helpfulHandles.push(new Handles(this,'star','sharp',5,true));
+		this.helpfulHandles.push(new Handles(this,'line','sharp',5,true));
+		this.helpfulHandles.push(new Handles(this));
+		
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'GrannyKnot',curve:new THREE.Curves.GrannyKnot()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'HeartCurve',curve:new THREE.Curves.HeartCurve(3.5)}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'VivianiCurve',curve:new THREE.Curves.VivianiCurve(10)}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'KnotCurve',curve:new THREE.Curves.KnotCurve()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'HelixCurve',curve:new THREE.Curves.HelixCurve(),isClosed:false}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TrefoilKnot',curve:new THREE.Curves.TrefoilKnot()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TorusKnot',curve:new THREE.Curves.TorusKnot(20)}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'CinquefoilKnot',curve:new THREE.Curves.CinquefoilKnot(20)}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'TrefoilPolynomialKnot',curve:new THREE.Curves.TrefoilPolynomialKnot(14)}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'FigureEightPolynomialKnot',curve:new THREE.Curves.FigureEightPolynomialKnot()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot4a',curve:new THREE.Curves.DecoratedTorusKnot4a()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot4b',curve:new THREE.Curves.DecoratedTorusKnot4b()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot5a',curve:new THREE.Curves.DecoratedTorusKnot5a()}));
+		this.helpfulHandles.push(new Handles(this,'custom','smooth',0,false,{name:'DecoratedTorusKnot5c',curve:new THREE.Curves.DecoratedTorusKnot5c()}));
+	}
+
+}
+CurveEditor.fromJSON = function(JSONStr){
+	var parsed = JSON.parse(JSONStr);
+	var result = new CurveEditor(parent,parsed.CurveEditor.options)
+	
 }
 
 /*
@@ -621,6 +654,12 @@ Handles.prototype = {
 		this.selected = this.dragged = handle;
 		this.handlesToShow = this.handlesToShow > 0 ? this.handlesToShow + 1 : this.HandlesToShow;
 		this.CPsToShow = this.CPsToShow > 0 ? this.CPsToShow + 1 : 0;
+	},
+	toJSON:function(){
+		return {Handles: {
+			name:this.name, shape:this.shape, smoothness:this.smoothness, 
+			reflections:this.reflections, joined:this.joined, options:this.options,
+				baseHandles:this.baseHandles}};
 	}
 				
 
@@ -688,6 +727,9 @@ Handle.prototype = {
 				this.cpOffset[0] * mult,
 				this.cpOffset[1] * mult
 			]);
+	},
+	toJSON:function(){
+		return {Handle: {pt:this.pt, cpOffset:this.cpOffset}};
 	}
 }
 

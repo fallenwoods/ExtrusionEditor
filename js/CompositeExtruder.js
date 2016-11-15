@@ -192,6 +192,7 @@ function CompositeExtrudeGeometry (crossSection, options, transformerOptions) {
 	// create side walls
 	var result = new THREE.ParametricGeometry(this.uvFunc,crossSectionGeo.vertices.length-1,this.options.extrudeSteps-1);	
 	
+
 	
 	// If we close the extrusion (join the end face back to the starting face), then we won't close it...
 	if(this.options.closeExtrusion) {	// close requested, so connect end to beginning

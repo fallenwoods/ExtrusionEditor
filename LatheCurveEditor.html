@@ -75,6 +75,9 @@ circle{
     <td>
 		<table>
 			<tr>
+				<input id="export" type="button" value="Load" onclick="loadObject();"/>
+			</tr>
+			<tr>
 				<div class="crossSection" width="400" height="200"/>
 			</tr>
 			<tr>
@@ -91,7 +94,8 @@ circle{
 			<tr>
 				<input id="export" type="button" value="Capture" onclick="captureMesh();"/>
 				<a id='download' download='Extruder.obj' type='text/plain'>Download</a>
-
+				<input type="file" id="importFile" onchange="importFile(files)">
+<output id="list"></output>
 			</tr>
 		</table>
 	</td>
@@ -101,6 +105,7 @@ circle{
 		<script>
 
 			var container;
+			var editors=[];
 
 			var camera, scene, renderer, controls, material, material2;
 
@@ -125,17 +130,17 @@ circle{
 	}
 
 );
-			var editors=[];
+
 			init();
 			animate();	
 			
 
 			function init() {
 			
-				editors.push(new CurveEditor(".crossSection",{isClosed:true,range:[-2,2],callback:crossSectionCallback,handleChoice:2}));
-				editors.push(new CurveEditor(".scale",{range:[2,-2],callback:scaleCallback,handleChoice:1,origin:[-1,0]}));
+				editors.push(new CurveEditor(".crossSection",{isClosed:true,range:[-2,2],callback:crossSectionCallback,handleChoiceIndx:1}));
+				editors.push(new CurveEditor(".scale",{range:[2,-2],callback:scaleCallback,handleChoiceIndx:11,origin:[-1,0]}));
 				editors.push(new CurveEditor(".rotation",{range:[-1.1,1.1],callback:rotationCallback}));
-				editors.push(new CurveEditor(".spine",{range:[-2,2],callback:spineCallback,handleChoice:2}));
+				editors.push(new CurveEditor(".spine",{range:[-2,2],callback:spineCallback,handleChoiceIndx:11}));
 
 				var info = document.createElement( 'div' );
 				info.style.position = 'absolute';
@@ -300,6 +305,22 @@ var rotAndBackFunc = function(v) { return v < 0.5 ? v*2*Math.PI : (1-v)*2*Math.P
 	return result;
 }			
 var sceneUpdated = false;
+function loadObject(objectStr) {
+/*
+	objectStr ='[{"options":{"isClosed":true,"range":[-2,2],"handleChoiceIndx":2,"size":150,"origin":[0,0],"scaleMultiplier":1},"handleChoice":{"name":"smooth-circle-4-joined","shape":"circle","smoothness":"smooth","reflections":4,"joined":true,"options":{},"baseHandles":[{"pt":[0,1],"cpOffset":[0.5066666666666666,0.9733333333333332]}],"viewHandles":null}},{"options":{"range":[2,-2],"handleChoiceIndx":1,"origin":[-1,0],"size":150,"scaleMultiplier":1},"handleChoice":{"name":"sharp-line-2","shape":"line","smoothness":"sharp","reflections":2,"joined":false,"options":{"offset":1},"baseHandles":[{"pt":[0,1],"cpOffset":[0,0]}],"viewHandles":[{"pt":[0,1],"cpOffset":[0,0]},{"pt":[1.2246467991473532e-16,-1],"cpOffset":[0,0]}]}},{"options":{"range":[-1.1,1.1],"size":150,"origin":[0,0],"scaleMultiplier":1,"handleChoiceIndx":0},"handleChoice":{"name":"sharp-line-2","shape":"line","smoothness":"sharp","reflections":2,"joined":false,"options":{},"baseHandles":[{"pt":[0,1],"cpOffset":[0,0]}],"viewHandles":[{"pt":[0,1],"cpOffset":[0,0]},{"pt":[1.2246467991473532e-16,-1],"cpOffset":[0,0]}]}},{"options":{"range":[-2,2],"handleChoiceIndx":2,"size":150,"origin":[0,1],"scaleMultiplier":1},"handleChoice":{"name":"smooth-circle-4-joined","shape":"circle","smoothness":"smooth","reflections":4,"joined":true,"options":{},"baseHandles":[{"pt":[0,1],"cpOffset":[0.5522847498307933,0]}],"viewHandles":null},"scaleMultiplier":5}]';
+	*/
+	
+	//fixme - the callbacks for redrawing get lost in this process.
+	// fixme - origin and slider don't get redrawn (they are not part of the redraw code.
+	var parsed = JSON.parse(objectStr);
+	editors = [];
+	editors.push(CurveEditor.fromJSON(".crossSection", crossSectionCallback, parsed[0]));
+	editors.push(CurveEditor.fromJSON(".scale", scaleCallback, parsed[1]));
+	editors.push(CurveEditor.fromJSON(".rotation", rotationCallback, parsed[2]));
+	editors.push(CurveEditor.fromJSON(".spine", spineCallback, parsed[3]));
+	sceneUpdated = true;
+
+}
 var crossSectionCurve;// = new THREE.Shape();crossSectionCurve.absarc(0,0,10,0,2*Math.PI);
 var closeCrossSection;
 function crossSectionCallback(handleChoice) {
@@ -355,7 +376,7 @@ var editorRotationFunc = function(v) {
 					scene.remove(scene.getObjectById(scene.editorObject[1]))
 				}
 				var geo = new CompositeLatheExtruder(
-					crossSectionCurve, spineCurve, scaleCurve, rotationCurve, 47, 10,
+					crossSectionCurve, spineCurve, scaleCurve, rotationCurve, 47, 100,
 					{
 						closeExtrusion:closeExtrusion,
 						capExtrusion: false, 
@@ -402,14 +423,39 @@ var editorRotationFunc = function(v) {
 				var mesh = scene.getObjectById(scene.editorObject[0]);
 				if(mesh){
 					var editorStr = JSON.stringify(editors);
+					console.log(editorStr);
 					var result = exporter.parse( mesh );
 
 					var data = new Blob(['#EditorSettings ' + editorStr + '\n\n'+result]);
 					var download = document.getElementById('download');
-					download.href = URL.createObjectURL(data);
+					download.href = URL.createObjectURL(data);	// fixme- after creating the href, can we auto-click it to start the download? Can we hide the href?
 
 				}
 			}
+
+			function importFile(files) {
+				//var files = evt.target.files; // FileList object
+				var f = files[0];	// we only load one
+
+				if (!f.name.endsWith(".obj")) return;
+				var reader = new FileReader();
+				
+				// Closure to capture the file information.
+				reader.onload = (function(theFile) {
+				return function(e) {
+				  var file = theFile;
+				  // Render thumbnail.
+				  //console.log ("read file: "+escape(theFile.name));
+				  var JSONStr = e.target.result.substring('#EditorSettings '.length,e.target.result.indexOf('\n'));
+				  loadObject(JSONStr);
+				};
+				})(f);
+
+				// Read in the image file as a data URL.
+				reader.readAsText(f);
+			}
+
+			//document.getElementById('files').addEventListener('change', importFile, false);
 			//*/
 
 		</script>

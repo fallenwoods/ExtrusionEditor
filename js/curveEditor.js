@@ -6,37 +6,24 @@
 // The view should and controller could be separate entities built around the model
 // Question: If i separate these, where do things like undo for model selection go?
 
+// fixme - Add the file upload see: C:\src\_Universal Web Monitor\ServerSide\content\js\app.js 'dropzone'
+
 function CurveEditor(parentElement,options){
 	
+	this.options = options || {};
+		
 	this.initHelpfulHandles();
 	
-	if(typeof options === 'string') {
-		var parsed = JSON.parse(options);
-		this.options = parsed.options;
-		var handleChoice = -1;
-		for(var i = 0; i< this.helpfulHandles.length; i++){
-			if (this.helpfulHandles[i].name === this.options.handleChoice) { handleChoice = i; break;}
-		}
-		if(handleChoice == -1) {
-			var handles = parsed.handles;
-			handleChoice = this.helpfulHandles.length;
-			this.helpfulHandles.push( new Handles(this, handles.shape,handles.smoothness,handles.reflections,handles.joined,handles.options));
-		}
-		// fixme - we should not be reaching inside of Handles here.
-		this.handleChoice.baseHandles = parsed.handles.baseHandles;
-	}
 
-	this.options = options || {};
 
-	this.CPsToShow = options.CPsToShow !== undefined ? options.CPsToShow : true;
 	this.callback = options.callback ;
-	this.isClosed = options.isClosed ? options.isClosed : false;	//default is false (or undefined)
+	//this.isClosed = options.isClosed ? options.isClosed : false;	//default is false (or undefined)
 	//this.handles = options.handles;
 	this.options.range = options.range || [-3,3];	// reasonable default for open editors
 	this.options.size = options.size || 150;
 	this.options.origin = options.origin || [0,0];
 	this.options.scaleMultiplier = options.scaleMultiplier !== undefined ? options.scaleMultiplier : 1;
-	this.options.handleChoice = options.handleChoice || 0;
+	this.options.handleChoiceIndx = options.handleChoiceIndx || 0;
 	this.canvas = new MyCanvas (this.options.size, this.options.range);
 	
 	this.ctrlKey = false;
@@ -48,8 +35,8 @@ function CurveEditor(parentElement,options){
 	this.scaleMultiplier = this.options.scaleMultiplier || 1;
 	this.origin = this.options.origin || [0,0];
 
-	
-	this.table = d3.select(parentElement||"body").append("table")
+	d3.select(parentElement).select(".curveEditor").remove();
+	this.table = d3.select(parentElement).append("table").classed("curveEditor",true);
 
 	this.svg = this.table.append("svg")
 		.attr("width", this.canvas.size)
@@ -133,7 +120,7 @@ function CurveEditor(parentElement,options){
 			.attr("value", function(d,i) { 
 				return i; })
 			.attr("selected", function(d,i) { 
-					if (i === (this.options.handleChoice || 0)) {
+					if (i === (this.options.handleChoiceIndx || 0)) {
 
 						editor.handleChoice =  editor.helpfulHandles[i];
 						return true;
@@ -311,7 +298,6 @@ CurveEditor.prototype = {
 	  var newHandle = this.handleChoice.addHandleNearPoint(pt);
 	  this.selected = this.dragged = {d:newHandle,c:'knot'};
 	  this.addHistory('addHandle',this.selected);
-	  this.historyStack.push({action:'newHandle'});
 	  this.redraw();
 	},
 
@@ -456,17 +442,16 @@ CurveEditor.prototype = {
 			this.undo();
 	},
 	toJSON:function(){
-		return {curveEditor:
-			{options:this.options,
-			 handleChoice:this.helpfulHandles[this.options.handleChoice]
-			}
+		return {
+			options:this.options,
+			handleChoice:this.helpfulHandles[this.options.handleChoiceIndx],
+			scaleMultiplier:this.scaleMultiplier
 		};
 	},
 	initHelpfulHandles:function(){
 		
 		this.helpfulHandles = [];	
 
-		this.helpfulHandles.push(new Handles(this,'line','sharp',2,false));
 		this.helpfulHandles.push(new Handles(this,'line','sharp',2,false,{offset:1}));
 		this.helpfulHandles.push(new Handles(this,'circle','smooth',4,true));
 		this.helpfulHandles.push(new Handles(this,'circle','smooth',4,false));
@@ -497,10 +482,28 @@ CurveEditor.prototype = {
 	}
 
 }
-CurveEditor.fromJSON = function(JSONStr){
-	var parsed = JSON.parse(JSONStr);
-	var result = new CurveEditor(parent,parsed.CurveEditor.options)
-	
+CurveEditor.fromJSON = function(parentElement, callback, JSONObj){
+	var result = null;
+	if(JSONObj) {
+		result = new CurveEditor(parentElement,JSONObj.options);
+		
+		// Find the saved Handles in the list if it's there
+		var handleChoiceIndx = -1;
+		for(var i = 0; i< result.helpfulHandles.length; i++){
+			if (result.helpfulHandles[i].name === JSONObj.handleChoice.name) { handleChoiceIndx = i; break;}
+		}
+		// It's not there, let's make room for it at the end
+		if(handleChoiceIndx == -1)	{
+			handleChoiceIndx = result.helpfulHandles.length;
+			result.helpfulHandles.push({});	// make a place for the new entry
+		} 
+		result.handleChoice = result.helpfulHandles[handleChoiceIndx] = Handles.fromJSON(result,JSONObj.handleChoice );
+		result.scaleMultiplier = JSONObj.scaleMultiplier || result.scaleMultiplier;
+		result.table.select(".scaleMultiplier").node().value=this.scaleMultiplier;
+		result.callback = callback;
+		result.redraw();
+	}
+	return result;
 }
 
 /*
@@ -656,13 +659,34 @@ Handles.prototype = {
 		this.CPsToShow = this.CPsToShow > 0 ? this.CPsToShow + 1 : 0;
 	},
 	toJSON:function(){
-		return {Handles: {
+		return {
 			name:this.name, shape:this.shape, smoothness:this.smoothness, 
 			reflections:this.reflections, joined:this.joined, options:this.options,
-				baseHandles:this.baseHandles}};
+				baseHandles:this.baseHandles,
+				viewHandles:this.joined ? null : this.viewHandles };
 	}
 				
 
+}
+Handles.fromJSON = function(editor,JSONObj){
+	var result = null;
+	if (JSONObj) {
+		result = new Handles(editor,JSONObj.shape,JSONObj.smoothness,JSONObj.reflections,JSONObj.joined,JSONObj.options);
+		result.baseHandles=[];
+		for(var i = 0;i<JSONObj.baseHandles.length;i++){
+			result.baseHandles.push (Handle.fromJSON(editor,JSONObj.baseHandles[i]));
+		}
+		delete result.viewHandles;
+		if (JSONObj.viewHandles){
+			result.viewHandles=[];
+			for(var i = 0;i<JSONObj.viewHandles.length;i++){
+				result.viewHandles.push (Handle.fromJSON(editor,JSONObj.viewHandles[i]));
+			}
+		} else {
+			result.viewHandles = result.getViewHandles();
+		}
+	}
+	return result;
 }
 // One Handle in Handles
 // Handles are used to set the parameters of the CubicSplines used for curves. Each handle has a point and a control point. The curve will go through
@@ -729,8 +753,15 @@ Handle.prototype = {
 			]);
 	},
 	toJSON:function(){
-		return {Handle: {pt:this.pt, cpOffset:this.cpOffset}};
+		return{pt:this.pt, cpOffset:this.cpOffset};
 	}
+}
+Handle.fromJSON = function(editor,JSONObj){
+	var result = null
+	if(JSONObj){
+		result = new Handle(editor, JSONObj.pt, JSONObj.cpOffset);
+	}
+	return result;
 }
 
 // The canvsa provides a mapping from a range (typically in the 0-1 range) to the dimensions of the region in the browser
